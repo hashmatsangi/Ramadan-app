@@ -6,68 +6,50 @@
 <title>اوقات نماز</title>
 
 <style>
-:root{
-  --green:#0b3d2e;
-  --bg:#f4f7f6;
-  --card:#ffffff;
-  --border:#e3e7e6;
-}
-
-html,body{
+body{
   margin:0;
   font-family:system-ui;
-  background:var(--bg);
+  background:#f4f7f6;
 }
-
 .header{
   background:#fff;
   padding:16px;
   text-align:center;
   font-weight:900;
-  font-size:18px;
-  color:var(--green);
-  border-bottom:1px solid var(--border);
+  font-size:20px;
+  color:#0b3d2e;
+  border-bottom:1px solid #e3e7e6;
 }
-
-.container{
-  padding:16px;
-}
-
+.container{padding:16px;}
 .card{
-  background:var(--card);
-  border:1px solid var(--border);
+  background:#fff;
   border-radius:16px;
-  padding:14px;
+  padding:16px;
   margin-bottom:16px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
 }
-
 select,button{
   padding:10px;
   border-radius:12px;
   border:1px solid #cfded7;
   font-size:14px;
 }
-
 button{
   background:#e8f3ef;
   font-weight:700;
 }
-
+.big{
+  font-size:26px;
+  font-weight:900;
+  color:#0b3d2e;
+}
 table{
   width:100%;
   border-collapse:collapse;
 }
-
 td{
   padding:10px;
   border-bottom:1px solid #eee;
-  font-size:15px;
-}
-
-.big{
-  font-size:22px;
-  font-weight:900;
-  color:var(--green);
 }
 </style>
 </head>
@@ -82,83 +64,64 @@ td{
 
 <div class="card">
 <select id="citySelect">
-<option value="mulhouse">Mulhouse</option>
-<option value="nancy">Nancy</option>
-<option value="strasbourg">Strasbourg</option>
-<option value="lyon">Lyon</option>
-<option value="auto">📍 موقعیت فعلی</option>
+<option value="47.75,7.33">Mulhouse</option>
+<option value="48.69,6.18">Nancy</option>
+<option value="48.57,7.75">Strasbourg</option>
+<option value="45.76,4.83">Lyon</option>
 </select>
-
-<button onclick="renderPrayer()">به‌روزرسانی</button>
+<button onclick="loadPrayer()">به‌روزرسانی</button>
 </div>
 
 <div class="card">
-<div>تاریخ: <span id="today"></span></div>
+تاریخ: <span id="today"></span>
 </div>
 
 <div class="card">
-<div>سحر (فجر)</div>
+سحر (فجر)
 <div class="big" id="fajr">--:--</div>
 <br>
-<div>افطار (مغرب)</div>
+افطار (مغرب)
 <div class="big" id="maghrib">--:--</div>
 </div>
 
 <div class="card">
 <table>
-<tbody id="prayerTable"></tbody>
+<tbody id="table"></tbody>
 </table>
 </div>
 
 </div>
 
 <script>
-const cities={
-  mulhouse:{lat:47.75,lng:7.33},
-  nancy:{lat:48.69,lng:6.18},
-  strasbourg:{lat:48.57,lng:7.75},
-  lyon:{lat:45.76,lng:4.83}
-};
-
-document.getElementById("today").innerText=
+document.getElementById("today").innerText =
 new Date().toLocaleDateString("fa-IR",{dateStyle:"full"});
 
-function renderPrayer(){
-  let city=document.getElementById("citySelect").value;
-  let coords;
+function loadPrayer(){
+  const value = document.getElementById("citySelect").value;
+  const parts = value.split(",");
+  const lat = parts[0];
+  const lng = parts[1];
 
-  if(city==="auto"){
-    if(!navigator.geolocation){
-      alert("GPS پشتیبانی نمی‌شود");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(pos=>{
-      coords={lat:pos.coords.latitude,lng:pos.coords.longitude};
-      showTimes(coords);
-    },()=>{
-      alert("اجازه GPS داده نشد");
-    });
-  }else{
-    coords=cities[city];
-    showTimes(coords);
-  }
+  fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lng}&method=2`)
+  .then(res => res.json())
+  .then(data => {
+      const t = data.data.timings;
+
+      document.getElementById("fajr").innerText = t.Fajr;
+      document.getElementById("maghrib").innerText = t.Maghrib;
+
+      document.getElementById("table").innerHTML = `
+      <tr><td>فجر</td><td>${t.Fajr}</td></tr>
+      <tr><td>طلوع</td><td>${t.Sunrise}</td></tr>
+      <tr><td>ظهر</td><td>${t.Dhuhr}</td></tr>
+      <tr><td>عصر</td><td>${t.Asr}</td></tr>
+      <tr><td>مغرب</td><td>${t.Maghrib}</td></tr>
+      <tr><td>عشاء</td><td>${t.Isha}</td></tr>
+      `;
+  });
 }
 
-function showTimes(coords){
-  // اینجا می‌توان بعداً محاسبه نجومی دقیق گذاشت
-  document.getElementById("fajr").innerText="--:--";
-  document.getElementById("maghrib").innerText="--:--";
-
-  let rows=`
-<tr><td>مختصات</td><td>${coords.lat.toFixed(2)} , ${coords.lng.toFixed(2)}</td></tr>
-<tr><td>فجر</td><td>--:--</td></tr>
-<tr><td>ظهر</td><td>--:--</td></tr>
-<tr><td>عصر</td><td>--:--</td></tr>
-<tr><td>مغرب</td><td>--:--</td></tr>
-<tr><td>عشاء</td><td>--:--</td></tr>
-`;
-  document.getElementById("prayerTable").innerHTML=rows;
-}
+loadPrayer();
 </script>
 
 </body>
