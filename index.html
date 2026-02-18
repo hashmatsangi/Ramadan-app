@@ -3,53 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>پلان ختم قرآن + اوقات نماز</title>
+<title>اوقات نماز</title>
 
 <style>
 :root{
   --green:#0b3d2e;
-  --bg:#f5f7f6;
+  --bg:#f4f7f6;
   --card:#ffffff;
   --border:#e3e7e6;
-  --bottomH:120px;
 }
 
 html,body{
   margin:0;
-  height:100%;
   font-family:system-ui;
   background:var(--bg);
-  overflow:hidden;
-}
-
-.app{
-  display:flex;
-  flex-direction:column;
-  height:100dvh;
 }
 
 .header{
   background:#fff;
-  padding:14px;
+  padding:16px;
   text-align:center;
   font-weight:900;
+  font-size:18px;
   color:var(--green);
   border-bottom:1px solid var(--border);
 }
 
-.main{
-  flex:1;
-  overflow-y:auto;
-  padding:15px;
-  padding-bottom:calc(var(--bottomH) + 30px);
+.container{
+  padding:16px;
 }
 
 .card{
   background:var(--card);
   border:1px solid var(--border);
   border-radius:16px;
-  padding:12px;
-  margin-bottom:14px;
+  padding:14px;
+  margin-bottom:16px;
+}
+
+select,button{
+  padding:10px;
+  border-radius:12px;
+  border:1px solid #cfded7;
+  font-size:14px;
+}
+
+button{
+  background:#e8f3ef;
+  font-weight:700;
 }
 
 table{
@@ -57,65 +58,27 @@ table{
   border-collapse:collapse;
 }
 
-th,td{
-  padding:8px;
+td{
+  padding:10px;
   border-bottom:1px solid #eee;
-  text-align:right;
-  font-size:14px;
+  font-size:15px;
 }
 
-.bottomNav{
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  height:var(--bottomH);
-  background:#fff;
-  border-top:1px solid var(--border);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:20px;
+.big{
+  font-size:22px;
+  font-weight:900;
+  color:var(--green);
 }
-
-.bottomNav button{
-  padding:12px 20px;
-  border-radius:14px;
-  border:1px solid #cfded7;
-  background:#f0f6f4;
-  font-weight:700;
-}
-
-.hidden{display:none}
 </style>
 </head>
 
 <body>
-<div class="app">
 
 <div class="header">
-پلان ختم قرآن + اوقات نماز
+اوقات نماز + سحر و افطار
 </div>
 
-<div class="main">
-
-<!-- KHATM -->
-<div id="khatmSection">
-
-<div class="card">
-<div id="kDate"></div>
-<table>
-<thead>
-<tr><th>جز</th><th>اسم</th></tr>
-</thead>
-<tbody id="kBody"></tbody>
-</table>
-</div>
-
-</div>
-
-<!-- PRAYER -->
-<div id="prayerSection" class="hidden">
+<div class="container">
 
 <div class="card">
 <select id="citySelect">
@@ -125,59 +88,31 @@ th,td{
 <option value="lyon">Lyon</option>
 <option value="auto">📍 موقعیت فعلی</option>
 </select>
+
 <button onclick="renderPrayer()">به‌روزرسانی</button>
 </div>
 
 <div class="card">
+<div>تاریخ: <span id="today"></span></div>
+</div>
+
+<div class="card">
+<div>سحر (فجر)</div>
+<div class="big" id="fajr">--:--</div>
+<br>
+<div>افطار (مغرب)</div>
+<div class="big" id="maghrib">--:--</div>
+</div>
+
+<div class="card">
 <table>
-<tbody id="prayerBody"></tbody>
+<tbody id="prayerTable"></tbody>
 </table>
 </div>
 
 </div>
 
-</div>
-
-<div class="bottomNav">
-<button onclick="showKhatm()">پلان ختم</button>
-<button onclick="showPrayer()">اوقات نماز</button>
-</div>
-
-</div>
-
 <script>
-/* ===== NAVIGATION ===== */
-function showKhatm(){
-  document.getElementById("khatmSection").classList.remove("hidden");
-  document.getElementById("prayerSection").classList.add("hidden");
-}
-function showPrayer(){
-  document.getElementById("prayerSection").classList.remove("hidden");
-  document.getElementById("khatmSection").classList.add("hidden");
-}
-
-/* ===== KHATM ===== */
-const names=[
-"مدیر صاحب رسا","هدایت سادات","کاکر صاحب","شکیب احمدی","مدیر صاحب ظاهر خان",
-"ملا صاحب احمدی","دگروال صاحب سادات","بصیر خان عزیز","عمرزاده صاحب","جمعه خان رحمانی",
-"تیمور خان تیموری","سنگی صاحب","روح الله خان صمدی","فهیم خان مشتاق","حفیظ خان عطایی",
-"قاری صاحب سلیمان تیموری","انجینر صاحب ستوده","رسولی صاحب","رسولی صاحب","معاون صاحب همدرد",
-"مروت صاحب","مروت صاحب","یاسین خان رحیمی","یاسین خان رحیمی","طارق تیموری",
-"ارسلان تیموری","قسیم خان حیدری","رسولی صاحب","بابه گل خان فیضی","مدیر صاحب نسیم اختری"
-];
-
-function renderKhatm(){
-  document.getElementById("kDate").innerText=
-  new Date().toLocaleDateString("fa-IR",{dateStyle:"full"});
-  let body="";
-  for(let i=0;i<30;i++){
-    body+=`<tr><td>جز ${i+1}</td><td>${names[i]}</td></tr>`;
-  }
-  document.getElementById("kBody").innerHTML=body;
-}
-renderKhatm();
-
-/* ===== PRAYER SIMPLE VERSION ===== */
 const cities={
   mulhouse:{lat:47.75,lng:7.33},
   nancy:{lat:48.69,lng:6.18},
@@ -185,7 +120,10 @@ const cities={
   lyon:{lat:45.76,lng:4.83}
 };
 
-async function renderPrayer(){
+document.getElementById("today").innerText=
+new Date().toLocaleDateString("fa-IR",{dateStyle:"full"});
+
+function renderPrayer(){
   let city=document.getElementById("citySelect").value;
   let coords;
 
@@ -207,16 +145,19 @@ async function renderPrayer(){
 }
 
 function showTimes(coords){
-  let now=new Date();
+  // اینجا می‌توان بعداً محاسبه نجومی دقیق گذاشت
+  document.getElementById("fajr").innerText="--:--";
+  document.getElementById("maghrib").innerText="--:--";
+
   let rows=`
 <tr><td>مختصات</td><td>${coords.lat.toFixed(2)} , ${coords.lng.toFixed(2)}</td></tr>
-<tr><td>فجر</td><td>—</td></tr>
-<tr><td>ظهر</td><td>—</td></tr>
-<tr><td>عصر</td><td>—</td></tr>
-<tr><td>مغرب</td><td>—</td></tr>
-<tr><td>عشاء</td><td>—</td></tr>
+<tr><td>فجر</td><td>--:--</td></tr>
+<tr><td>ظهر</td><td>--:--</td></tr>
+<tr><td>عصر</td><td>--:--</td></tr>
+<tr><td>مغرب</td><td>--:--</td></tr>
+<tr><td>عشاء</td><td>--:--</td></tr>
 `;
-  document.getElementById("prayerBody").innerHTML=rows;
+  document.getElementById("prayerTable").innerHTML=rows;
 }
 </script>
 
