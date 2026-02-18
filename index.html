@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b3d2e" />
+  <title>اوقات سحر و افطار + نمازها</title>
+  <style>
+    body{font-family:system-ui;margin:16px;background:linear-gradient(#f7faf9,#eef6f3);color:#143}
+    .wrap{max-width:980px;margin:auto}
+    .card{background:#fff;border:1px solid #dde7e2;border-radius:16px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:12px}
+    h1{font-size:18px;margin:0 0 6px;color:#0b3d2e}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    select,button{padding:10px 12px;border-radius:12px;border:1px solid #cfded7;background:#fff;font-size:14px}
+    button{cursor:pointer}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:820px){.grid{grid-template-columns:1fr 1fr}}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #cfe3db;background:#f4fbf8;font-size:12px}
+    .big{font-size:16px;font-weight:700}
+    .muted{color:#466; font-size:13px; line-height:1.6}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #eef3f1;text-align:right}
+    th{font-size:13px;color:#355}
+    td{font-size:14px}
+    .kpi{display:flex;gap:10px;flex-wrap:wrap}
+    .kpi .box{flex:1 1 220px;background:#f4fbf8;border:1px solid #d8ebe4;border-radius:14px;padding:12px}
+    .count{font-size:20px;font-weight:800;color:#0b3d2e}
+    .warn{font-size:12px;color:#556;margin-top:6px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>اوقات سحر و افطار + نمازهای پنج‌گانه (به وقت فرانسه)</h1>
+    <div class="row">
+      <span class="pill" id="today"></span>
+      <span class="pill" id="tz"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="muted">شهر:</label>
+      <select id="city">
+        <option value="mulhouse">Mulhouse (مولوز)</option>
+        <option value="nancy">Nancy (نانسی)</option>
+        <option value="strasbourg">Strasbourg (استراسبورگ)</option>
+      </select>
+
+      <label class="muted">روش محاسبه:</label>
+      <select id="method">
+        <option value="MWL">Muslim World League (MWL)</option>
+        <option value="ISNA">ISNA</option>
+        <option value="EGYPT">Egyptian</option>
+        <option value="KARACHI">Karachi</option>
+        <option value="MAKKAH">Umm al-Qura (Makkah)</option>
+      </select>
+
+      <button id="refresh">به‌روزرسانی</button>
+    </div>
+
+    <div class="warn">
+      ⚠️ یادآوری: زمان‌ها محاسباتی‌اند و ممکن است با تقویم مسجد/شهر چند دقیقه فرق داشته باشند.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="kpi">
+      <div class="box">
+        <div class="muted">سحر (پایان سحری)</div>
+        <div class="count" id="suhoor">—</div>
+        <div class="muted">= وقت فجر</div>
+      </div>
+      <div class="box">
+        <div class="muted">افطار</div>
+        <div class="count" id="iftar">—</div>
+        <div class="muted">= وقت مغرب</div>
+      </div>
+      <div class="box">
+        <div class="muted">رویداد بعدی</div>
+        <div class="count" id="nextName">—</div>
+        <div class="muted">زمان باقی‌مانده: <span class="big" id="countdown">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>نام</th><th>وقت</th></tr>
+      </thead>
+      <tbody id="timesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card muted">
+    <div class="big" style="margin-bottom:6px">نصب مثل اپ روی موبایل</div>
+    1) همین فایل را با Chrome باز کن  ➜  2) منو (سه نقطه)  ➜  <b>Add to Home screen</b> (افزودن به صفحه اصلی)
+  </div>
+</div>
+
+<script>
+/* ====== PrayTimes (محاسبه اوقات نماز) — نسخه خلاصه شده/کلاسیک ====== */
+/* منبع الگوریتم: praytimes.org (کد محاسباتی رایج). */
+(function(){
+  function PrayTimes(method){
+    this.methods = {
+      MWL:   {name:'Muslim World League',   params:{fajr:18, isha:17}},
+      ISNA:  {name:'ISNA',                  params:{fajr:15, isha:15}},
+      EGYPT: {name:'Egyptian',              params:{fajr:19.5, isha:17.5}},
+      KARACHI:{name:'Karachi',              params:{fajr:18, isha:18}},
+      MAKKAH:{name:'Umm al-Qura',           params:{fajr:18.5, isha:'90 min'}}
+    };
+    this.setting = {imsak:'10 min', dhuhr:'0 min', asr:'Standard', highLats:'NightMiddle', midnight:'Standard'};
+    this.calcMethod = method || 'MWL';
+    this.params = this.methods[this.calcMethod].params;
+
+    this.timeNames = {imsak:'امساک', fajr:'فجر', sunrise:'طلوع', dhuhr:'ظهر', asr:'عصر', sunset:'غروب', maghrib:'مغرب', isha:'عشاء', midnight:'نیمه‌شب'};
+  }
+
+  PrayTimes.prototype.getTimes = function(date, coords, timezone, dst){
+    this.lat = coords[0]; this.lng = coords[1]; this.elv = coords[2] || 0;
+    this.timeZone = timezone;
+    this.jDate = this.julian(date.getFullYear(), date.getMonth()+1, date.getDate()) - this.lng/(15*24);
+    return this.computeTimes();
+  };
+
+  PrayTimes.prototype.computeTimes = function(){
+    var times = {imsak:5, fajr:5, sunrise:6, dhuhr:12, asr:13, sunset:18, maghrib:18, isha:18, midnight:0};
+    times = this.computePrayerTimes(times);
+    times = this.adjustTimes(times);
+
+    // imsak from fajr
+    times.imsak = this.timeDiff(times.fajr, this.evalTime(this.setting.imsak));
+
+    // maghrib: same as sunset unless custom (we keep sunset)
+    times.maghrib = times.sunset;
+
+    // midnight
+    if (this.setting.midnight === 'Standard')
+      times.midnight = this.timeSum(times.sunset, this.timeDiff(times.sunset, times.fajr)/2);
+    else
+      times.midnight = this.timeSum(times.sunset, this.timeDiff(times.sunset, times.sunrise)/2);
+
+    return this.formatTimes(times);
+  };
+
+  PrayTimes.prototype.computePrayerTimes = function(times){
+    var t = this.dayPortion(times);
+    var fajr    = this.sunAngleTime(this.params.fajr, t.fajr, 'ccw');
+    var sunrise = this.sunAngleTime(this.riseSetAngle(), t.sunrise, 'ccw');
+    var dhuhr   = this.midDay(t.dhuhr);
+    var asr     = this.asrTime(this.asrFactor(this.setting.asr), t.asr);
+    var sunset  = this.sunAngleTime(this.riseSetAngle(), t.sunset, 'cw');
+    var isha    = (typeof this.params.isha === 'string') ? this.timeSum(sunset, 90/60) : this.sunAngleTime(this.params.isha, t.isha, 'cw');
+    return {imsak: times.imsak, fajr:fajr, sunrise:sunrise, dhuhr:dhuhr, asr:asr, sunset:sunset, maghrib:sunset, isha:isha, midnight:times.midnight};
+  };
+
+  PrayTimes.prototype.adjustTimes = function(times){
+    for (var i in times) times[i] += this.timeZone - this.lng/15;
+    // dhuhr offset
+    times.dhuhr = this.timeSum(times.dhuhr, this.evalTime(this.setting.dhuhr));
+    return times;
+  };
+
+  PrayTimes.prototype.asrFactor = function(asrParam){
+    return (asrParam === 'Hanafi') ? 2 : 1;
+  };
+
+  PrayTimes.prototype.riseSetAngle = function(){
+    // 0.833 deg + elevation correction (approx)
+    return 0.833 + 0.0347*Math.sqrt(this.elv);
+  };
+
+  PrayTimes.prototype.midDay = function(time){
+    var eqt = this.sunPosition(this.jDate + time).equation;
+    return this.fixHour(12 - eqt);
+  };
+
+  PrayTimes.prototype.sunAngleTime = function(angle, time, direction){
+    var decl = this.sunPosition(this.jDate + time).declination;
+    var noon = this.midDay(time);
+    var t = 1/15 * this.arccos((-this.sin(angle) - this.sin(decl)*this.sin(this.lat)) / (this.cos(decl)*this.cos(this.lat)));
+    return noon + (direction === 'ccw' ? -t : t);
+  };
+
+  PrayTimes.prototype.asrTime = function(factor, time){
+    var decl = this.sunPosition(this.jDate + time).declination;
+    var angle = -this.arccot(factor + this.tan(Math.abs(this.lat - decl)));
+    return this.sunAngleTime(angle, time, 'cw');
+  };
+
+  PrayTimes.prototype.sunPosition = function(jd){
+    var D = jd - 2451545.0;
+    var g = this.fixAngle(357.529 + 0.98560028*D);
+    var q = this.fixAngle(280.459 + 0.98564736*D);
+    var L = this.fixAngle(q + 1.915*this.sin(g) + 0.020*this.sin(2*g));
+    var e = 23.439 - 0.00000036*D;
+    var RA = this.arctan2(this.cos(e)*this.sin(L), this.cos(L))/15;
+    var eqt = q/15 - this.fixHour(RA);
+    var decl = this.arcsin(this.sin(e)*this.sin(L));
+    return {declination: decl, equation: eqt};
+  };
+
+  PrayTimes.prototype.julian = function(y,m,d){
+    if (m <= 2){ y -= 1; m += 12; }
+    var A = Math.floor(y/100);
+    var B = 2 - A + Math.floor(A/4);
+    return Math.floor(365.25*(y+4716)) + Math.floor(30.6001*(m+1)) + d + B - 1524.5;
+  };
+
+  PrayTimes.prototype.dayPortion = function(times){
+    for (var i in times) times[i] /= 24;
+    return times;
+  };
+
+  PrayTimes.prototype.formatTimes = function(times){
+    var out = {};
+    for (var i in times) out[i] = this.getFormattedTime(times[i]);
+    return out;
+  };
+
+  PrayTimes.prototype.getFormattedTime = function(time){
+    if (isNaN(time)) return '—';
+    time = this.fixHour(time + 0.5/60); // rounding
+    var hours = Math.floor(time);
+    var minutes = Math.floor((time - hours) * 60);
+    return this.twoDigits(hours) + ':' + this.twoDigits(minutes);
+  };
+
+  PrayTimes.prototype.twoDigits = function(n){ return (n < 10 ? '0' : '') + n; };
+
+  PrayTimes.prototype.evalTime = function(str){
+    if (typeof str === 'number') return str/60;
+    var m = (str+'').match(/(\d+)\s*min/i);
+    if (m) return parseInt(m[1],10)/60;
+    return 0;
+  };
+
+  PrayTimes.prototype.timeSum = function(time, diff){ return time + diff; };
+  PrayTimes.prototype.timeDiff = function(time1, diff){ return time1 - diff; };
+
+  PrayTimes.prototype.fixHour = function(a){ a = a - 24*Math.floor(a/24); return (a < 0) ? a + 24 : a; };
+  PrayTimes.prototype.fixAngle = function(a){ a = a - 360*Math.floor(a/360); return (a < 0) ? a + 360 : a; };
+
+  PrayTimes.prototype.sin = function(d){ return Math.sin(this.dtr(d)); };
+  PrayTimes.prototype.cos = function(d){ return Math.cos(this.dtr(d)); };
+  PrayTimes.prototype.tan = function(d){ return Math.tan(this.dtr(d)); };
+
+  PrayTimes.prototype.arcsin = function(x){ return this.rtd(Math.asin(x)); };
+  PrayTimes.prototype.arccos = function(x){ return this.rtd(Math.acos(x)); };
+  PrayTimes.prototype.arctan2 = function(y,x){ return this.rtd(Math.atan2(y,x)); };
+  PrayTimes.prototype.arccot = function(x){ return this.rtd(Math.atan(1/x)); };
+
+  PrayTimes.prototype.dtr = function(d){ return d * Math.PI/180; };
+  PrayTimes.prototype.rtd = function(r){ return r * 180/Math.PI; };
+
+  window.PrayTimes = PrayTimes;
+})();
+
+/* ====== App logic ====== */
+const CITIES = {
+  mulhouse:   { name: "Mulhouse (مولوز)",     lat: 47.7508, lng: 7.3359, elv: 250 },
+  nancy:      { name: "Nancy (نانسی)",       lat: 48.6921, lng: 6.1844, elv: 220 },
+  strasbourg: { name: "Strasbourg (استراسبورگ)", lat: 48.5734, lng: 7.7521, elv: 140 }
+};
+
+const citySel = document.getElementById('city');
+const methodSel = document.getElementById('method');
+const refreshBtn = document.getElementById('refresh');
+
+const suhoorEl = document.getElementById('suhoor');
+const iftarEl = document.getElementById('iftar');
+const bodyEl = document.getElementById('timesBody');
+const nextNameEl = document.getElementById('nextName');
+const countdownEl = document.getElementById('countdown');
+
+function fmtDateFA(d){
+  return new Intl.DateTimeFormat('fa-IR', { dateStyle:'full' }).format(d);
+}
+function tzName(){
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris';
+}
+document.getElementById('today').textContent = fmtDateFA(new Date());
+document.getElementById('tz').textContent = "Timezone: " + tzName();
+
+function parseHHMM(hhmm, baseDate){
+  const [h,m] = hhmm.split(':').map(x=>parseInt(x,10));
+  const d = new Date(baseDate);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function computeAndRender(){
+  const now = new Date();
+  document.getElementById('today').textContent = fmtDateFA(now);
+
+  const city = CITIES[citySel.value];
+  const method = methodSel.value;
+
+  const pt = new PrayTimes(method);
+
+  // timezone = Europe/Paris offset
+  const tzOffsetHours = -now.getTimezoneOffset()/60; // e.g. +1 or +2 depending DST
+  const times = pt.getTimes(now, [city.lat, city.lng, city.elv], tzOffsetHours, 0);
+
+  // نمایش سحر/افطار
+  suhoorEl.textContent = times.fajr;
+  iftarEl.textContent = times.maghrib;
+
+  // جدول
+  const rows = [
+    ["امساک", times.imsak],
+    ["فجر (سحر پایان)", times.fajr],
+    ["طلوع", times.sunrise],
+    ["ظهر", times.dhuhr],
+    ["عصر", times.asr],
+    ["مغرب (افطار)", times.maghrib],
+    ["عشاء", times.isha],
+  ];
+  bodyEl.innerHTML = rows.map(([n,t]) => `<tr><td>${n}</td><td>${t}</td></tr>`).join('');
+
+  // رویداد بعدی + شمارش معکوس
+  const schedule = [
+    {key:"imsak",  name:"امساک",  time: times.imsak},
+    {key:"fajr",   name:"فجر",    time: times.fajr},
+    {key:"sunrise",name:"طلوع",   time: times.sunrise},
+    {key:"dhuhr",  name:"ظهر",    time: times.dhuhr},
+    {key:"asr",    name:"عصر",    time: times.asr},
+    {key:"maghrib",name:"مغرب",   time: times.maghrib},
+    {key:"isha",   name:"عشاء",   time: times.isha},
+  ].map(e => ({...e, dt: parseHHMM(e.time, now)}));
+
+  let next = schedule.find(e => e.dt > now);
+  if(!next){
+    // اگر روز تمام شد، فردا فجر را بگیر
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate()+1);
+    const times2 = pt.getTimes(tomorrow, [city.lat, city.lng, city.elv], tzOffsetHours, 0);
+    next = { name:"فجر (فردا)", dt: parseHHMM(times2.fajr, tomorrow) };
+  }
+
+  nextNameEl.textContent = next.name;
+
+  function tick(){
+    const n = new Date();
+    const diff = next.dt - n;
+    if(diff <= 0){
+      computeAndRender();
+      return;
+    }
+    const s = Math.floor(diff/1000);
+    const hh = Math.floor(s/3600);
+    const mm = Math.floor((s%3600)/60);
+    const ss = s%60;
+    countdownEl.textContent = String(hh).padStart(2,'0') + ":" + String(mm).padStart(2,'0') + ":" + String(ss).padStart(2,'0');
+    requestAnimationFrame(()=>{}); // no-op, keep light
+    setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+refreshBtn.addEventListener('click', computeAndRender);
+citySel.addEventListener('change', computeAndRender);
+methodSel.addEventListener('change', computeAndRender);
+
+computeAndRender();
+</script>
+</body>
+</html>
